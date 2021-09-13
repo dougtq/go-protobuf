@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"time"
 
 	"github.com/dougtq/go-protobuf/pb"
 	"google.golang.org/grpc"
@@ -25,6 +26,8 @@ func main() {
 	fmt.Println(new_user)
 
 	AddUserVerbose(client)
+
+	AddUsers(client)
 
 }
 
@@ -65,4 +68,49 @@ func AddUserVerbose(client pb.UserServiceClient) {
 		}
 		fmt.Println("Status:", stream.Status, " - ", stream.GetUser())
 	}
+}
+
+func AddUsers(client pb.UserServiceClient) {
+	reqs := []*pb.User{
+		{
+			Id:    "1",
+			Name:  "Douglas",
+			Email: "d@d.com",
+		},
+		{
+			Id:    "2",
+			Name:  "Lucas",
+			Email: "l@l.com",
+		},
+		{
+			Id:    "3",
+			Name:  "Fernando",
+			Email: "f@f.com",
+		},
+		{
+			Id:    "4",
+			Name:  "Jonas",
+			Email: "j@j.com",
+		},
+	}
+
+	stream, err := client.AddUsers(context.Background())
+
+	if err != nil {
+		log.Fatalf("Couldn't initiate stream %v", err)
+	}
+
+	for _, req := range reqs {
+		fmt.Println("Sending...", req.Id)
+		stream.Send(req)
+		time.Sleep(time.Second * 3)
+	}
+
+	resp, err := stream.CloseAndRecv()
+
+	if err != nil {
+		log.Fatalf("Couldn't close stream conn and/or receive response %v", err)
+	}
+
+	fmt.Println(resp)
 }

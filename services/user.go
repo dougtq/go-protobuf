@@ -3,6 +3,8 @@ package services
 import (
 	"context"
 	"fmt"
+	"io"
+	"log"
 	"time"
 
 	"github.com/dougtq/go-protobuf/pb"
@@ -10,8 +12,9 @@ import (
 
 type UserServiceServer interface {
 	// AddUser(context.Context, *User) (*User, error)
-	// mustEmbedUnimplementedUserServiceServer()
+	// AddUsers(UserService_AddUsersServer) error
 	// AddUserVerbose(ctx context.Context, in *User, opts ...grpc.CallOption) (UserService_AddUserVerboseClient, error)
+	// mustEmbedUnimplementedUserServiceServer()
 }
 
 type UserService struct {
@@ -31,6 +34,33 @@ func (*UserService) AddUser(ctx context.Context, req *pb.User) (*pb.User, error)
 		Name:  req.GetName(),
 		Email: req.GetEmail(),
 	}, nil
+}
+
+func (*UserService) AddUsers(stream pb.UserService_AddUsersServer) error {
+	users := []*pb.User{}
+
+	for {
+		req, err := stream.Recv()
+		if err == io.EOF {
+			log.Println("Stream has ended")
+			return stream.SendAndClose(&pb.Users{
+				User: users,
+			})
+		}
+
+		if err != nil {
+			log.Fatalf("Unknown error ocurred on stream %v", err)
+		}
+
+		users = append(users, &pb.User{
+			Id:    req.GetId(),
+			Name:  req.GetName(),
+			Email: req.GetEmail(),
+		})
+
+		fmt.Println("Adding", req.GetId())
+		fmt.Println(users)
+	}
 }
 
 func (*UserService) AddUserVerbose(req *pb.User, stream pb.UserService_AddUserVerboseServer) error {

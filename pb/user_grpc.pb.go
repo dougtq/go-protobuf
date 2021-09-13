@@ -19,6 +19,7 @@ const _ = grpc.SupportPackageIsVersion7
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserServiceClient interface {
 	AddUser(ctx context.Context, in *User, opts ...grpc.CallOption) (*User, error)
+	AddUsers(ctx context.Context, opts ...grpc.CallOption) (UserService_AddUsersClient, error)
 	AddUserVerbose(ctx context.Context, in *User, opts ...grpc.CallOption) (UserService_AddUserVerboseClient, error)
 }
 
@@ -39,8 +40,42 @@ func (c *userServiceClient) AddUser(ctx context.Context, in *User, opts ...grpc.
 	return out, nil
 }
 
+func (c *userServiceClient) AddUsers(ctx context.Context, opts ...grpc.CallOption) (UserService_AddUsersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[0], "/pb.UserService/AddUsers", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &userServiceAddUsersClient{stream}
+	return x, nil
+}
+
+type UserService_AddUsersClient interface {
+	Send(*User) error
+	CloseAndRecv() (*Users, error)
+	grpc.ClientStream
+}
+
+type userServiceAddUsersClient struct {
+	grpc.ClientStream
+}
+
+func (x *userServiceAddUsersClient) Send(m *User) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *userServiceAddUsersClient) CloseAndRecv() (*Users, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(Users)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *userServiceClient) AddUserVerbose(ctx context.Context, in *User, opts ...grpc.CallOption) (UserService_AddUserVerboseClient, error) {
-	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[0], "/pb.UserService/AddUserVerbose", opts...)
+	stream, err := c.cc.NewStream(ctx, &UserService_ServiceDesc.Streams[1], "/pb.UserService/AddUserVerbose", opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +111,7 @@ func (x *userServiceAddUserVerboseClient) Recv() (*UserResultStream, error) {
 // for forward compatibility
 type UserServiceServer interface {
 	AddUser(context.Context, *User) (*User, error)
+	AddUsers(UserService_AddUsersServer) error
 	AddUserVerbose(*User, UserService_AddUserVerboseServer) error
 	mustEmbedUnimplementedUserServiceServer()
 }
@@ -86,6 +122,9 @@ type UnimplementedUserServiceServer struct {
 
 func (UnimplementedUserServiceServer) AddUser(context.Context, *User) (*User, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AddUser not implemented")
+}
+func (UnimplementedUserServiceServer) AddUsers(UserService_AddUsersServer) error {
+	return status.Errorf(codes.Unimplemented, "method AddUsers not implemented")
 }
 func (UnimplementedUserServiceServer) AddUserVerbose(*User, UserService_AddUserVerboseServer) error {
 	return status.Errorf(codes.Unimplemented, "method AddUserVerbose not implemented")
@@ -119,6 +158,32 @@ func _UserService_AddUser_Handler(srv interface{}, ctx context.Context, dec func
 		return srv.(UserServiceServer).AddUser(ctx, req.(*User))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _UserService_AddUsers_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(UserServiceServer).AddUsers(&userServiceAddUsersServer{stream})
+}
+
+type UserService_AddUsersServer interface {
+	SendAndClose(*Users) error
+	Recv() (*User, error)
+	grpc.ServerStream
+}
+
+type userServiceAddUsersServer struct {
+	grpc.ServerStream
+}
+
+func (x *userServiceAddUsersServer) SendAndClose(m *Users) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *userServiceAddUsersServer) Recv() (*User, error) {
+	m := new(User)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
 }
 
 func _UserService_AddUserVerbose_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -155,6 +220,11 @@ var UserService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "AddUsers",
+			Handler:       _UserService_AddUsers_Handler,
+			ClientStreams: true,
+		},
 		{
 			StreamName:    "AddUserVerbose",
 			Handler:       _UserService_AddUserVerbose_Handler,
