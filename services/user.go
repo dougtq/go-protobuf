@@ -84,3 +84,26 @@ func (*UserService) AddUserVerbose(req *pb.User, stream pb.UserService_AddUserVe
 
 	return nil
 }
+
+func (*UserService) AddUserTwoWayStream(stream pb.UserService_AddUserTwoWayStreamServer) error {
+	for {
+		req, err := stream.Recv()
+
+		if err == io.EOF {
+			return nil
+		}
+
+		if err != nil {
+			log.Fatalf("Error receiveng client streamed data: %v", err)
+		}
+
+		err = stream.Send(&pb.UserResultStream{
+			Status: "inserted",
+			User:   req,
+		})
+
+		if err != nil {
+			log.Fatalf("Error sending data: %v", err)
+		}
+	}
+}

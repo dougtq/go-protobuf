@@ -22,13 +22,21 @@ func main() {
 
 	client := pb.NewUserServiceClient(connection)
 
+	log.Println("----------- Default ------------")
 	new_user := AddUser(client)
 	fmt.Println(new_user)
+	log.Println("----------- End of Default ------------")
 
+	log.Println("----------- Server Stream ------------")
 	AddUserVerbose(client)
+	log.Println("----------- End of Server Stream ------------")
 
+	log.Println("----------- Client Stream ------------")
 	AddUsers(client)
-
+	log.Println("----------- End of Client Stream ------------")
+	log.Println("----------- 2Way Stream ------------")
+	AddUserTwoWayStream(client)
+	log.Println("----------- End of 2Way Stream ------------")
 }
 
 func AddUser(client pb.UserServiceClient) *pb.User {
@@ -113,4 +121,73 @@ func AddUsers(client pb.UserServiceClient) {
 	}
 
 	fmt.Println(resp)
+}
+
+func AddUserTwoWayStream(client pb.UserServiceClient) {
+	reqs := []*pb.User{
+		{
+			Id:    "1",
+			Name:  "Douglas",
+			Email: "d@d.com",
+		},
+		{
+			Id:    "2",
+			Name:  "Lucas",
+			Email: "l@l.com",
+		},
+		{
+			Id:    "3",
+			Name:  "Fernando",
+			Email: "f@f.com",
+		},
+		{
+			Id:    "4",
+			Name:  "Jonas",
+			Email: "j@j.com",
+		},
+		{
+			Id:    "5",
+			Name:  "Gustave",
+			Email: "g@g.com",
+		},
+	}
+
+	stream, err := client.AddUserTwoWayStream(context.Background())
+
+	if err != nil {
+		log.Fatalf("Error creating request: %v", err)
+	}
+
+	wait := make(chan int)
+
+	go func() {
+		for _, req := range reqs {
+			fmt.Println("Sending user: ", req.GetId())
+			stream.Send(req)
+			time.Sleep(time.Second * 3)
+		}
+		log.Println("All data sent")
+		stream.CloseSend()
+	}()
+
+	go func() {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+
+			if err != nil {
+				log.Fatalf("Error receiving stream from server: %v", err)
+			}
+
+			fmt.Printf("Receiving user %v with status %v \n", res.GetUser().GetId(), res.GetStatus())
+		}
+
+		log.Println("All data received")
+
+		close(wait)
+	}()
+
+	<-wait
 }
